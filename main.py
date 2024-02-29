@@ -5,7 +5,7 @@ import numpy as np
 from datetime import datetime
 import pickle
 import openpyxl 
-
+import time
 
 #open workbook
 wb = openpyxl.load_workbook("FacialRecogAttendance.xlsx")
@@ -27,6 +27,8 @@ class FaceRecognition:
 
     def __init__(self):
         self.encode_faces()
+        self.process_current_frame = True
+        self.frame_counter = 0
         
         try:
             with open('face_encodings.pkl', 'rb') as file:
@@ -65,6 +67,11 @@ class FaceRecognition:
     #run facial recognition
     def run_recognition(self):
         
+        prev_frame_time = 0
+  
+# used to record the time at which we processed current frame 
+        new_frame_time = 0
+        
         #change number of cameras
         video_capture = cv2.VideoCapture(0)
         
@@ -77,10 +84,22 @@ class FaceRecognition:
         previous_face = None
         current_face = None
         
+        
+        
         while True:
             ret, frame = video_capture.read()
+        
             
             if self.process_current_frame:
+                
+                new_frame_time = time.time()
+                fps = 1/(new_frame_time-prev_frame_time) 
+                prev_frame_time = new_frame_time 
+                fps = int(fps)
+                fps = str(fps)
+                
+                print("fps:" + fps)
+                
                 small_frame = cv2.resize(frame, (0,0), fx=0.25, fy=0.25)
                 rgb_small_frame = np.ascontiguousarray(small_frame[:, :, ::-1])
                 
@@ -105,7 +124,7 @@ class FaceRecognition:
                         # condition if face matches from reference_images folder
                         if matches[best_match_index]:
                         
-                            print(limiter)
+                            # print(limiter)
                             current_face = self.known_face_names[best_match_index]
                             
                             if limiter == 0 or current_face != previous_face:   
@@ -124,7 +143,7 @@ class FaceRecognition:
                                 wb.save('FacialRecogAttendance.xlsx')
                                 
                                 limiter += 1
-                                print(limiter)
+                                #print(limiter)
                                 
                             elif 0 < limiter < 10:
                                 print('Not saving data')
@@ -145,10 +164,10 @@ class FaceRecognition:
                         name = "Visitor..."  
                 
                 colorFrame1 = colorFrame
-            
-            colorVerify = colorFrame1    
-            
+
             self.process_current_frame = not self.process_current_frame
+            colorVerify = colorFrame1  
+        
             
             # places green/red frame around user face with text       
             for(top, right, bottom, left), name in zip(self.face_locations, self.face_names):
@@ -157,7 +176,7 @@ class FaceRecognition:
                 right *= 4
                 bottom *= 4
                 left *= 4
-                
+            
                 cv2.rectangle(frame, (left, top), (right, bottom), colorVerify, 2)
                 cv2.rectangle(frame, (left, bottom - 35), (right, bottom), colorVerify, -1) 
                 cv2.putText(frame, name, (left + 6, bottom - 6), cv2.FONT_HERSHEY_DUPLEX, 0.8, (255,255,255), 1)
@@ -167,6 +186,7 @@ class FaceRecognition:
             #key to terminate program
             if cv2.waitKey(1) == ord('q'):
                 break
+        
             
         video_capture.release()
         cv2.destroyAllWindows()
